@@ -119,7 +119,7 @@
 
 ## 설치·제거
 
-- 엔진 런타임: mitmproxy 공식 macOS 독립 실행 파일을 `/Library/Application Support/Impel Down/mitmproxy/`에 둔다. Homebrew·시스템 Python에 의존하지 않는다.
+- 엔진 런타임: mitmproxy 공식 macOS 배포본(`mitmproxy.app` 번들, Python 내장)을 `/Library/Application Support/Impel Down/mitmproxy.app`에 통째로 둔다. Homebrew·시스템 Python에 의존하지 않는다.
 - `engine/install.sh` (sudo 한 번):
 	1. 위 디렉토리 생성, 실행 파일·애드온 복사, root 소유.
 	2. LaunchDaemon plist 설치 후 `launchctl bootstrap`.
