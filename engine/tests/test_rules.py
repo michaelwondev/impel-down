@@ -208,3 +208,45 @@ def test_mirror_hosts_only_always_closed_whole_hosts():
 
 def test_empty():
     assert Rules.empty().groups == []
+
+
+# ---- Task 4: 규칙 파일 재로드 ----
+import os
+import time
+from impel.rules import RulesFile
+
+GOOD = '{"version": 1, "groups": [{"id": "a", "title": "a", "addresses": ["a.example"]}]}'
+GOOD2 = '{"version": 1, "groups": [{"id": "b", "title": "b", "addresses": ["b.example"]}]}'
+
+
+def _write(path, text):
+    path.write_text(text, encoding="utf-8")
+    # mtime 해상도보다 확실히 뒤로
+    t = time.time() + 2
+    os.utime(str(path), (t, t))
+
+
+def test_rulesfile_missing_is_empty(tmp_path):
+    rf = RulesFile(str(tmp_path / "rules.json"))
+    assert rf.current().groups == [] and rf.version == 0
+
+
+def test_rulesfile_loads_and_reloads_on_mtime(tmp_path):
+    p = tmp_path / "rules.json"
+    _write(p, GOOD)
+    rf = RulesFile(str(p))
+    assert rf.current().groups[0].id == "a" and rf.version == 1
+    assert rf.current().groups[0].id == "a" and rf.version == 1  # mtime 같으면 안 읽음
+    _write(p, GOOD2)
+    assert rf.current().groups[0].id == "b" and rf.version == 2
+
+
+def test_rulesfile_keeps_last_good_on_bad_content(tmp_path):
+    p = tmp_path / "rules.json"
+    _write(p, GOOD)
+    logs = []
+    rf = RulesFile(str(p), log=logs.append)
+    rf.current()
+    _write(p, "{ broken")
+    assert rf.current().groups[0].id == "a"
+    assert rf.version == 1 and logs and "reload failed" in logs[0]

@@ -1,9 +1,10 @@
 """규칙 파일 로드·검증, 주소 매칭, 시간표 판정. mitmproxy에 의존하지 않는다."""
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, FrozenSet, List, Optional
+from typing import Callable, Dict, FrozenSet, List, Optional
 
 DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]  # index == datetime.weekday()
 _WEEK_HOURS = 24 * 7
@@ -158,3 +159,31 @@ class Rules:
                     out.add(a.host)
                     out.add("www." + a.host)
         return sorted(out)
+
+
+class RulesFile:
+    """규칙 파일을 수정 시각 기준으로 다시 읽는다. 실패하면 직전 규칙을 유지한다."""
+
+    def __init__(self, path: str, log: Optional[Callable[[str], None]] = None):
+        self.path = path
+        self.version = 0
+        self._mtime = None  # type: Optional[int]
+        self._rules = Rules.empty()
+        self._log = log or (lambda msg: None)
+
+    def current(self) -> Rules:
+        try:
+            mtime = os.stat(self.path).st_mtime_ns
+        except FileNotFoundError:
+            return self._rules
+        if mtime == self._mtime:
+            return self._rules
+        self._mtime = mtime
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                text = f.read()
+            self._rules = Rules.from_json(text)
+            self.version += 1
+        except (OSError, ValueError) as e:
+            self._log("rules reload failed: %s" % e)
+        return self._rules
