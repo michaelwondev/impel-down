@@ -1,7 +1,6 @@
 # Impel Down — 설계
 
 2026-09-10. macOS에서 오락 사이트를 브라우저 불문 차단하는 개인용 도구.
-사이트를 가두는 감옥이고, 시간표는 면회 시간이다.
 
 ## 목적
 
@@ -97,6 +96,7 @@
 
 - 엔진이 30초마다 모든 네트워크 서비스의 HTTP·HTTPS 프록시 설정을 확인한다.
 	- 비어 있거나 다른 값이면 `127.0.0.1:포트`로 다시 잡는다. 새로 생긴 서비스(VPN 등)도 같은 처리.
+- 시스템 프록시를 따르는 브라우저 외 앱의 요청도 같은 판정을 받는다.
 
 ### hosts 관리
 
@@ -104,7 +104,7 @@
 	- 규칙이 바뀔 때마다 블록을 통째로 다시 쓴다. 블록 밖은 건드리지 않는다.
 	- hosts는 서브도메인을 못 잡으므로 등록된 문자열 그대로와 `www.` 변형만 쓴다.
 	- 호스트명 문법(`[a-z0-9.-]`, 점 경계)을 통과한 값만 쓴다. 경로가 있는 주소나 그 외 문자열은 쓰지 않는다.
-- 엔진이 죽어 있는 동안에도 이 사이트들은 막힌다.
+- 프록시를 거치지 않는 경로(프록시 설정이 풀린 경우 등)에서도 이 사이트들은 막힌다.
 
 ### 실행 주체와 권한
 
@@ -119,7 +119,7 @@
 
 ## 설치·제거
 
-- 엔진 런타임: mitmproxy 공식 macOS 독립 실행 파일을 `/Library/Application Support/Impel Down/mitmproxy/`에 둔다. Homebrew·시스템 Python에 의존하지 않는다.
+- 엔진 런타임: mitmproxy 공식 macOS 배포본(`mitmproxy.app` 번들, Python 내장)을 `/Library/Application Support/Impel Down/mitmproxy.app`에 통째로 둔다. Homebrew·시스템 Python에 의존하지 않는다.
 - `engine/install.sh` (sudo 한 번):
 	1. 위 디렉토리 생성, 실행 파일·애드온 복사, root 소유.
 	2. LaunchDaemon plist 설치 후 `launchctl bootstrap`.
