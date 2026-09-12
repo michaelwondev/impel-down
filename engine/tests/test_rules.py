@@ -124,3 +124,87 @@ def test_next_open_skips_current_hour():
     # 닫힌 시각에서 부르면 현재 시각 칸은 후보가 아니다
     g = _group({SUN: frozenset({0})})
     assert g.next_open(datetime(2026, 9, 12, 23, 30)) == datetime(2026, 9, 13, 0, 0)
+
+
+# ---- Task 3: 규칙 파일 파싱·판정·미러 목록 ----
+import json
+from impel.rules import Rules
+
+SAMPLE = {
+    "version": 1,
+    "groups": [
+        {"id": "g-community", "title": "커뮤니티",
+         "addresses": ["community.example", "video.example/shorts"],
+         "open": {"sat": [20, 21, 22], "sun": [20, 21, 22]}},
+        {"id": "g-always", "title": "상시", "addresses": ["forum.example"], "open": {}},
+    ],
+}
+
+
+def test_from_json_parses_groups():
+    r = Rules.from_json(json.dumps(SAMPLE))
+    assert [g.id for g in r.groups] == ["g-community", "g-always"]
+    assert r.groups[0].open_hours == {5: frozenset({20, 21, 22}), 6: frozenset({20, 21, 22})}
+    assert r.groups[1].always_closed()
+
+
+@pytest.mark.parametrize("bad", [
+    '{"version": 2, "groups": []}',
+    '{"version": 1, "groups": [{"title": "no id", "addresses": []}]}',
+    '{"version": 1, "groups": [{"id": "x", "addresses": "notalist"}]}',
+    '{"version": 1, "groups": [{"id": "x", "addresses": [], "open": {"funday": [1]}}]}',
+    '{"version": 1, "groups": [{"id": "x", "addresses": [], "open": {"mon": [24]}}]}',
+    '{"version": 1, "groups": [{"id": "x", "addresses": ["not a host"]}]}',
+    '[]',
+    'not json',
+])
+def test_from_json_rejects_bad_schema(bad):
+    with pytest.raises(ValueError):
+        Rules.from_json(bad)
+
+
+def test_from_json_skips_blank_addresses():
+    r = Rules.from_json('{"version": 1, "groups": [{"id": "x", "addresses": ["", "  ", "a.example"]}]}')
+    assert [a.host for a in r.groups[0].addresses] == ["a.example"]
+
+
+def test_intercept_host():
+    r = Rules.from_json(json.dumps(SAMPLE))
+    assert r.intercept_host("gall.community.example") is True
+    assert r.intercept_host("video.example") is True   # 경로 주소도 호스트는 복호화 대상
+    assert r.intercept_host("www.apple.example") is False
+
+
+def test_decide_blocks_when_closed():
+    r = Rules.from_json(json.dumps(SAMPLE))
+    g = r.decide("community.example", "/", datetime(2026, 9, 11, 21, 0))  # 금요일
+    assert g is not None and g.id == "g-community"
+
+
+def test_decide_passes_when_open():
+    r = Rules.from_json(json.dumps(SAMPLE))
+    assert r.decide("community.example", "/", datetime(2026, 9, 12, 21, 0)) is None  # 토요일 21시
+
+
+def test_decide_passes_unmatched_path():
+    r = Rules.from_json(json.dumps(SAMPLE))
+    assert r.decide("video.example", "/watch", datetime(2026, 9, 11, 21, 0)) is None
+
+
+def test_decide_any_closed_group_blocks():
+    doc = {"version": 1, "groups": [
+        {"id": "open-now", "title": "a", "addresses": ["dup.example"],
+         "open": {k: list(range(24)) for k in DAY_KEYS}},
+        {"id": "closed", "title": "b", "addresses": ["dup.example"], "open": {}},
+    ]}
+    g = Rules.from_json(json.dumps(doc)).decide("dup.example", "/", datetime(2026, 9, 11, 21, 0))
+    assert g is not None and g.id == "closed"
+
+
+def test_mirror_hosts_only_always_closed_whole_hosts():
+    r = Rules.from_json(json.dumps(SAMPLE))
+    assert r.mirror_hosts() == ["forum.example", "www.forum.example"]
+
+
+def test_empty():
+    assert Rules.empty().groups == []

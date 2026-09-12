@@ -1,4 +1,5 @@
 """규칙 파일 로드·검증, 주소 매칭, 시간표 판정. mitmproxy에 의존하지 않는다."""
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -88,3 +89,72 @@ class Group:
 
     def matches(self, host: str, path: str) -> bool:
         return any(a.matches(host, path) for a in self.addresses)
+
+
+@dataclass
+class Rules:
+    groups: List[Group]
+
+    @staticmethod
+    def empty() -> "Rules":
+        return Rules([])
+
+    @staticmethod
+    def from_json(text: str) -> "Rules":
+        """rules.json 본문을 파싱·검증한다. 어긋나면 ValueError."""
+        doc = json.loads(text)  # JSONDecodeError는 ValueError의 하위 클래스
+        if not isinstance(doc, dict) or doc.get("version") != 1:
+            raise ValueError("unsupported rules document")
+        raw_groups = doc.get("groups", [])
+        if not isinstance(raw_groups, list):
+            raise ValueError("groups must be a list")
+        groups = []
+        for g in raw_groups:
+            if not isinstance(g, dict):
+                raise ValueError("group must be an object")
+            gid = g.get("id")
+            if not isinstance(gid, str) or not gid:
+                raise ValueError("group id required")
+            title = g.get("title", "")
+            if not isinstance(title, str):
+                raise ValueError("title must be a string")
+            raw_addrs = g.get("addresses", [])
+            if not isinstance(raw_addrs, list):
+                raise ValueError("addresses must be a list")
+            addresses = [Address.parse(a) for a in raw_addrs if isinstance(a, str) and a.strip()]
+            raw_open = g.get("open") or {}
+            if not isinstance(raw_open, dict):
+                raise ValueError("open must be an object")
+            open_hours = {}  # type: Dict[int, FrozenSet[int]]
+            for key, hours in raw_open.items():
+                if key not in DAY_KEYS:
+                    raise ValueError("unknown day key: %r" % key)
+                if not isinstance(hours, list) or not all(
+                    isinstance(h, int) and not isinstance(h, bool) and 0 <= h <= 23 for h in hours
+                ):
+                    raise ValueError("hours for %s must be integers 0..23" % key)
+                open_hours[DAY_KEYS.index(key)] = frozenset(hours)
+            groups.append(Group(gid, title, addresses, open_hours))
+        return Rules(groups)
+
+    def intercept_host(self, host: str) -> bool:
+        return any(a.matches_host(host) for g in self.groups for a in g.addresses)
+
+    def decide(self, host: str, path: str, at: datetime) -> Optional[Group]:
+        """차단해야 하면 그 묶음(여럿이면 첫째), 아니면 None."""
+        for g in self.groups:
+            if g.matches(host, path) and not g.is_open(at):
+                return g
+        return None
+
+    def mirror_hosts(self) -> List[str]:
+        """hosts 블록에 미러할 호스트: 24시간 차단 묶음의 호스트 통째 주소 + www. 변형."""
+        out = set()
+        for g in self.groups:
+            if not g.always_closed():
+                continue
+            for a in g.addresses:
+                if a.path is None:
+                    out.add(a.host)
+                    out.add("www." + a.host)
+        return sorted(out)
