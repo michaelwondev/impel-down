@@ -1,16 +1,23 @@
-# 엔진 spike 결과 (2026-09-11, macOS arm64, mitmproxy 12.2.3)
+# 엔진 spike 결과 (2026-09-11 ~ 13, macOS arm64, mitmproxy 12.2.3)
 
 - tarball sha256: `0a09ee3b82569e8985aff8186e4792618b8e5d0c766098db093d09a87d4b013a` (`mitmproxy-12.2.3-macos-arm64.tar.gz`, 54MB)
 - tarball 구조: `mitmproxy.app/` 번들 하나. mitmdump는 `mitmproxy.app/Contents/MacOS/mitmdump`, Python 3.14가 `Contents/Frameworks`에 내장.
-	- 실행 파일만 떼어 옮기면 프레임워크 상대 경로가 깨진다 — `.app`을 통째로 둔다 (spec·plan에 반영).
+	- 실행 파일만 떼어 옮기면 프레임워크 상대 경로가 깨진다 — `.app`을 통째로 둔다 (spec·plan 반영).
 - 기동: 정상. `--version` → `Mitmproxy: 12.2.3 binary / Python: 3.14.4`. curl로 받은 파일이라 격리 속성 없음, 서명 경고 없음.
 - 연결별 통과·복호화: 기대대로.
 	- 규칙 밖 호스트: 인증서 지정 없이 `200` → 터널 통과 (로그에 server connect만, GET 없음).
 	- 규칙 호스트: CA 지정 시 `403` + `blocked` 본문. CA 없이는 curl exit 60(인증서 오류) → 복호화 확인.
 	- SNI 속성 표기: `data.context.client.sni` 그대로 통함.
-- 프록시 적용: 활성 서비스 (측정 전 — 보스 실측)
-- 엔진 죽은 상태 트래픽: 브라우저 (측정 전) · python urllib (측정 전)
-- 프록시 설정 변경 시 관리자 인증: (측정 전)
-- Safari 경유: Private Relay 켬 (측정 전) · 끔 (측정 전)
-- Chrome QUIC: (측정 전)
-- spec 수정 필요: 엔진 런타임을 "독립 실행 파일"에서 "`mitmproxy.app` 번들"로 (반영함). 그 외는 Step 3·4 결과 후 판단.
+- 프록시 적용: 활성 서비스 넷 전부 잡힘. 사용자 권한 `networksetup`으로 잡았고 관리자 인증 창은 뜨지 않았다.
+- 프록시 설정 변경 시 관리자 인증: 안 뜸 (사용자 권한). root LaunchDaemon에서의 동작은 Task 11 설치 때 확인.
+- Safari 경유: Private Relay 켬·끔 둘 다 `blocked` 페이지 표시. 요청이 프록시에 도착해 복호화 후 403.
+	- 테스트 CA는 login 키체인에 `-p ssl -p basic`으로 임시 신뢰, 끝나고 `delete-certificate -t`로 제거.
+- Chrome QUIC: youtube.com·googlevideo.com 전부 프록시 터널 경유. 우회 없음.
+- 엔진 죽은 상태 트래픽: 브라우저 "연결 안 됨" · python urllib `Connection refused`. 우회 없이 전부 막힌다.
+	- hosts 미러의 근거를 "엔진이 죽어 있는 동안"에서 "프록시 설정이 풀린 경우"로 바꾼다 (spec 반영).
+- 브라우저 외 앱: 시스템 프록시를 따른다. python urllib이 프록시 설정을 읽어 경유했고, 데스크톱 앱 트래픽도 프록시를 지났다.
+	- 실제 차단 범위는 브라우저보다 넓다 (spec 반영).
+- 측정 중 알게 된 것: mitmdump stdout을 파일로 리다이렉트하면 출력이 버퍼링돼 로그가 한참 뒤에 나온다. `PYTHONUNBUFFERED`는 이 번들에 안 먹힌다.
+	- 판정 근거는 애드온이 직접 쓰는 파일 로그로 잡았다.
+	- LaunchDaemon의 `StandardOutPath`도 같은 영향을 받을 수 있다 — Task 11 설치 때 기동 줄이 바로 보이는지 확인 (plan 반영).
+- spec 수정: 엔진 런타임을 `mitmproxy.app` 번들로 · hosts 미러 근거 · 브라우저 외 앱도 같은 판정. 전부 반영함.
