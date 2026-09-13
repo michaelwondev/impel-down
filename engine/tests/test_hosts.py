@@ -1,0 +1,56 @@
+from impel.hosts import BEGIN, END, render_block, replace_block, write_hosts
+
+BASE = "127.0.0.1\tlocalhost\n::1 localhost\n"
+
+
+def test_render_block_sorted_and_validated():
+    out = render_block(["b.example", "a.example", "bad host", "x.example/path"])
+    assert out == "# impel-down\n127.0.0.1 a.example\n127.0.0.1 b.example\n# /impel-down\n"
+
+
+def test_render_block_empty():
+    assert render_block([]) == ""
+    assert render_block(["not valid"]) == ""
+
+
+def test_replace_block_appends_when_absent():
+    out = replace_block(BASE, ["a.example"])
+    assert out == BASE + "\n# impel-down\n127.0.0.1 a.example\n# /impel-down\n"
+
+
+def test_replace_block_replaces_existing_and_keeps_rest():
+    old = BASE + "\n# impel-down\n127.0.0.1 old.example\n# /impel-down\n\n# other block\n1.2.3.4 keep.example\n"
+    out = replace_block(old, ["new.example"])
+    assert "old.example" not in out
+    assert "1.2.3.4 keep.example" in out
+    assert out.endswith("# impel-down\n127.0.0.1 new.example\n# /impel-down\n")
+    assert out.count(BEGIN) == 1 and out.count(END) == 1
+
+
+def test_replace_block_removes_when_empty():
+    old = BASE + "\n# impel-down\n127.0.0.1 old.example\n# /impel-down\n"
+    assert replace_block(old, []) == BASE
+
+
+def test_replace_block_idempotent():
+    once = replace_block(BASE, ["a.example"])
+    assert replace_block(once, ["a.example"]) == once
+
+
+def test_write_hosts_atomic_and_flushes(tmp_path):
+    p = tmp_path / "hosts"
+    p.write_text(BASE, encoding="utf-8")
+    flushed = []
+    assert write_hosts(["a.example"], path=str(p), flush=lambda: flushed.append(1)) is True
+    assert p.read_text(encoding="utf-8").endswith("127.0.0.1 a.example\n# /impel-down\n")
+    assert flushed == [1]
+    assert not (tmp_path / "hosts.impel-tmp").exists()
+
+
+def test_write_hosts_noop_when_unchanged(tmp_path):
+    p = tmp_path / "hosts"
+    p.write_text(BASE, encoding="utf-8")
+    write_hosts(["a.example"], path=str(p), flush=lambda: None)
+    flushed = []
+    assert write_hosts(["a.example"], path=str(p), flush=lambda: flushed.append(1)) is False
+    assert flushed == []
