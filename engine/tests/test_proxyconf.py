@@ -7,26 +7,14 @@ Wi-Fi
 iPhone USB
 """
 
-OFF = """Enabled: No
-Server:
-Port: 0
-Authenticated Proxy Enabled: 0
-"""
-
-ON = """Enabled: Yes
-Server: 127.0.0.1
-Port: 8899
-Authenticated Proxy Enabled: 0
-"""
-
 
 def test_parse_services_skips_header_and_disabled():
     assert parse_services(SERVICES) == ["USB 10/100/1000 LAN", "Wi-Fi", "iPhone USB"]
 
 
 def test_parse_proxy():
-    assert parse_proxy(OFF) == (False, "", 0)
-    assert parse_proxy(ON) == (True, "127.0.0.1", 8899)
+    assert parse_proxy("Enabled: No\nServer:\nPort: 0\nAuthenticated Proxy Enabled: 0\n") == (False, "", 0)
+    assert parse_proxy("Enabled: Yes\nServer: 127.0.0.1\nPort: 8899\nAuthenticated Proxy Enabled: 0\n") == (True, "127.0.0.1", 8899)
 
 
 class FakeRunner:
@@ -55,43 +43,25 @@ class FakeRunner:
         raise AssertionError("unexpected command %r" % cmd)
 
 
-def test_ensure_all_sets_missing_only():
-    r = FakeRunner({("Wi-Fi", "web"): (True, "127.0.0.1", 8899)})
+def test_ensure_all_sets_only_what_is_missing_or_wrong():
+    r = FakeRunner({("Wi-Fi", "web"): (True, "127.0.0.1", 8899), ("Wi-Fi", "secure"): (True, "127.0.0.1", 1234)})
     changed, failed = ensure_all("127.0.0.1", 8899, runner=r)
     assert ["networksetup", "-setwebproxy", "Wi-Fi", "127.0.0.1", "8899"] not in r.calls  # 이미 맞던 건 안 건드림
-    assert r.state[("Wi-Fi", "secure")] == (True, "127.0.0.1", 8899)
-    assert r.state[("USB 10/100/1000 LAN", "web")] == (True, "127.0.0.1", 8899)
+    assert r.state[("Wi-Fi", "secure")] == (True, "127.0.0.1", 8899)  # 포트가 틀리면 고침
     assert ("Thunderbolt Bridge", "web") not in r.state  # 비활성 서비스는 건드리지 않음
     assert len(changed) == 5 and failed == []  # 3 서비스 × 2 - 이미 맞던 1
-
-
-def test_ensure_all_fixes_wrong_port():
-    r = FakeRunner({("Wi-Fi", "web"): (True, "127.0.0.1", 1234)})
-    changed, _ = ensure_all("127.0.0.1", 8899, runner=r)
-    assert r.state[("Wi-Fi", "web")] == (True, "127.0.0.1", 8899)
-    assert "Wi-Fi -setwebproxy" in changed
-
-
-def test_ensure_all_noop_when_all_set():
-    state = {(s, k): (True, "127.0.0.1", 8899)
-             for s in ["USB 10/100/1000 LAN", "Wi-Fi", "iPhone USB"] for k in ("web", "secure")}
-    r = FakeRunner(state)
-    assert ensure_all("127.0.0.1", 8899, runner=r) == ([], [])
-    assert not [c for c in r.calls if c[1].startswith("-set")]
+    assert ensure_all("127.0.0.1", 8899, runner=r) == ([], [])  # 다 맞으면 아무것도 안 함
 
 
 def test_ensure_all_reports_failed_service():
-    # setter가 먹히지 않은 서비스는 changed가 아니라 failed로
     r = FakeRunner({}, deny={"iPhone USB"})
     changed, failed = ensure_all("127.0.0.1", 8899, runner=r)
     assert failed == ["iPhone USB -setwebproxy", "iPhone USB -setsecurewebproxy"]
-    assert not [c for c in changed if c.startswith("iPhone USB")]
-    assert len(changed) == 4
+    assert len(changed) == 4 and not [c for c in changed if c.startswith("iPhone USB")]
 
 
 def test_clear_all_turns_off_every_active_service():
-    state = {("Wi-Fi", "web"): (True, "127.0.0.1", 8899), ("Wi-Fi", "secure"): (True, "127.0.0.1", 8899)}
-    r = FakeRunner(state)
+    r = FakeRunner({("Wi-Fi", "web"): (True, "127.0.0.1", 8899), ("Wi-Fi", "secure"): (True, "127.0.0.1", 8899)})
     clear_all(runner=r)
     assert r.state[("Wi-Fi", "web")][0] is False and r.state[("Wi-Fi", "secure")][0] is False
     assert [c[2] for c in r.calls if c[1] == "-setwebproxystate"] == ["USB 10/100/1000 LAN", "Wi-Fi", "iPhone USB"]

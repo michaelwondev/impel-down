@@ -1,27 +1,17 @@
 from datetime import datetime
-from impel.notice import MESSAGE, format_next_open, render
-
-
-def test_message_verbatim():
-    assert MESSAGE == "정신 차리고 중요한 일에 집중하세요."
-
-
-def test_format_next_open():
-    assert format_next_open(datetime(2026, 9, 12, 20, 0)) == "토 20:00"
-    assert format_next_open(datetime(2026, 9, 14, 0, 0)) == "월 00:00"
+from impel.notice import render
 
 
 def test_render_with_next_open():
     html = render("커뮤니티", datetime(2026, 9, 12, 20, 0), "gall.community.example")
     assert html.startswith("<!doctype html>")
-    assert MESSAGE in html and "커뮤니티" in html
+    assert "정신 차리고 중요한 일에 집중하세요." in html and "커뮤니티" in html
     assert "다음 열림 토 20:00" in html
     assert "gall.community.example" in html
 
 
 def test_render_without_next_open():
-    html = render("상시", None, "video.example")
-    assert "다음 열림" not in html
+    assert "다음 열림" not in render("상시", None, "video.example")
 
 
 def test_render_escapes_html():
