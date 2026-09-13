@@ -32,6 +32,16 @@ def test_replace_block_removes_when_empty():
     assert replace_block(old, []) == BASE
 
 
+def test_replace_block_keeps_lines_after_dangling_begin():
+    # 끝 표식이 없으면 블록 범위를 모른다 — 시작 표식만 지우고 그 뒤 줄은 전부 보존
+    old = BASE + "\n# impel-down\n127.0.0.1 old.example\n1.2.3.4 user.example\n"
+    out = replace_block(old, ["new.example"])
+    assert "1.2.3.4 user.example" in out and "::1 localhost" in out
+    assert "127.0.0.1 old.example" in out
+    assert out.count(BEGIN) == 1 and out.count(END) == 1
+    assert out.endswith("# impel-down\n127.0.0.1 new.example\n# /impel-down\n")
+
+
 def test_replace_block_idempotent():
     once = replace_block(BASE, ["a.example"])
     assert replace_block(once, ["a.example"]) == once
