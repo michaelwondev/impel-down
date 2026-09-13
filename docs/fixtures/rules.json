@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "id": "g-community",
+      "title": "커뮤니티",
+      "addresses": ["community.example", "forum.example", "video.example/shorts"],
+      "open": { "sat": [20, 21, 22], "sun": [20, 21, 22] }
+    },
+    {
+      "id": "g-always",
+      "title": "상시",
+      "addresses": ["video.example"],
+      "open": {}
+    },
+    {
+      "id": "g-split",
+      "title": "점심·저녁",
+      "addresses": ["news.example"],
+      "open": { "mon": [9, 10, 14, 15], "tue": [9, 10, 14, 15] }
+    },
+    {
+      "id": "g-midnight",
+      "title": "자정 넘김",
+      "addresses": ["late.example"],
+      "open": { "sun": [23], "mon": [0] }
+    }
+  ]
+}

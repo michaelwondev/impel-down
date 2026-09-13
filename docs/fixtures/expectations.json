@@ -1,0 +1,21 @@
+{
+  "cases": [
+    { "group": "g-community", "at": "2026-09-12T20:30", "closed": false, "next_open": null, "summary": ["토·일 20–23"] },
+    { "group": "g-community", "at": "2026-09-12T19:30", "closed": true,  "next_open": "2026-09-12T20:00", "summary": ["토·일 20–23"] },
+    { "group": "g-community", "at": "2026-09-13T23:30", "closed": true,  "next_open": "2026-09-19T20:00", "summary": ["토·일 20–23"] },
+    { "group": "g-always",    "at": "2026-09-12T20:30", "closed": true,  "next_open": null, "summary": ["상시"] },
+    { "group": "g-split",     "at": "2026-09-14T11:00", "closed": true,  "next_open": "2026-09-14T14:00", "summary": ["월·화 9–11 · 14–16"] },
+    { "group": "g-split",     "at": "2026-09-14T15:59", "closed": false, "next_open": null, "summary": ["월·화 9–11 · 14–16"] },
+    { "group": "g-midnight",  "at": "2026-09-13T23:30", "closed": false, "next_open": null, "summary": ["월 0–1", "일 23–24"] },
+    { "group": "g-midnight",  "at": "2026-09-14T01:00", "closed": true,  "next_open": "2026-09-20T23:00", "summary": ["월 0–1", "일 23–24"] }
+  ],
+  "decide": [
+    { "host": "gall.community.example", "path": "/board?id=1", "at": "2026-09-11T21:00", "blocked_by": "g-community" },
+    { "host": "community.example",      "path": "/",           "at": "2026-09-12T21:00", "blocked_by": null },
+    { "host": "video.example",          "path": "/shorts/abc", "at": "2026-09-12T21:00", "blocked_by": "g-always" },
+    { "host": "video.example",          "path": "/watch",      "at": "2026-09-12T21:00", "blocked_by": "g-always" },
+    { "host": "news.example",           "path": "/",           "at": "2026-09-14T14:30", "blocked_by": null },
+    { "host": "news.example",           "path": "/",           "at": "2026-09-14T13:30", "blocked_by": "g-split" },
+    { "host": "unlisted.example",       "path": "/",           "at": "2026-09-14T13:30", "blocked_by": null }
+  ]
+}
