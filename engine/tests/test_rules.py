@@ -155,6 +155,7 @@ def test_from_json_parses_groups():
     '{"version": 1, "groups": [{"id": "x", "addresses": [], "open": {"funday": [1]}}]}',
     '{"version": 1, "groups": [{"id": "x", "addresses": [], "open": {"mon": [24]}}]}',
     '{"version": 1, "groups": [{"id": "x", "addresses": ["not a host"]}]}',
+    '{"version": 1, "groups": [{"id": "x", "addresses": ["a.example", 123]}]}',
     '[]',
     'not json',
 ])

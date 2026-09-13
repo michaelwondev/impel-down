@@ -122,7 +122,9 @@ class Rules:
             raw_addrs = g.get("addresses", [])
             if not isinstance(raw_addrs, list):
                 raise ValueError("addresses must be a list")
-            addresses = [Address.parse(a) for a in raw_addrs if isinstance(a, str) and a.strip()]
+            if not all(isinstance(a, str) for a in raw_addrs):
+                raise ValueError("addresses must be strings")
+            addresses = [Address.parse(a) for a in raw_addrs if a.strip()]  # 빈 줄만 건너뛴다
             raw_open = g.get("open") or {}
             if not isinstance(raw_open, dict):
                 raise ValueError("open must be an object")
